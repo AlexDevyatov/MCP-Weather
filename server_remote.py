@@ -317,11 +317,11 @@ async def get_prompt(name: str, arguments: dict[str, Any]) -> list[types.PromptM
 @click.option("--host", default=None, help="Host для привязки сервера (по умолчанию из env или 0.0.0.0)")
 @click.option("--port", default=None, type=int, help="Порт для привязки сервера (по умолчанию из env или 8000)")
 @click.option("--workers", default=1, help="Количество worker процессов")
-def main(host: str, port: int, workers: int) -> None:
+def main(host: Optional[str], port: Optional[int], workers: int) -> None:
     """Запуск MCP-сервера через SSE транспорт."""
     # Используем значения из аргументов или из конфига
-    host = host or Config.SERVER_HOST
-    port = port or Config.SERVER_PORT
+    host = host if host is not None else Config.SERVER_HOST
+    port = port if port is not None else Config.SERVER_PORT
     sse = SseServerTransport("/messages/")
 
     async def handle_sse(request: Request):
