@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "weather": {
-      "command": "python",
+      "command": "${workspaceFolder}/venv/bin/python",
       "args": ["server.py"],
       "cwd": "${workspaceFolder}",
       "env": {
