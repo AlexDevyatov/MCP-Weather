@@ -28,10 +28,10 @@ class Config:
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "10"))
     
     # Порт для удаленного сервера
-    SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8000"))
+    SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8001"))
     
     # Host для удаленного сервера
-    SERVER_HOST: str = os.getenv("SERVER_HOST", "0.0.0.0")
+    SERVER_HOST: str = os.getenv("SERVER_HOST", "185.28.85.26")
     
     @classmethod
     def validate(cls) -> None:

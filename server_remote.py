@@ -314,8 +314,8 @@ async def get_prompt(name: str, arguments: dict[str, Any]) -> list[types.PromptM
 
 
 @click.command()
-@click.option("--host", default=None, help="Host для привязки сервера (по умолчанию из env или 0.0.0.0)")
-@click.option("--port", default=None, type=int, help="Порт для привязки сервера (по умолчанию из env или 8000)")
+@click.option("--host", default=None, help="Host для привязки сервера (по умолчанию из env или 185.28.85.26)")
+@click.option("--port", default=None, type=int, help="Порт для привязки сервера (по умолчанию из env или 8001)")
 @click.option("--workers", default=1, help="Количество worker процессов")
 def main(host: Optional[str], port: Optional[int], workers: int) -> None:
     """Запуск MCP-сервера через SSE транспорт."""

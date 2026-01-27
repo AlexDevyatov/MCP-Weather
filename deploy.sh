@@ -78,7 +78,7 @@ deploy_docker() {
     fi
     
     # Проверка порта
-    PORT=${SERVER_PORT:-8000}
+    PORT=${SERVER_PORT:-8001}
     if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
         warn "Порт $PORT уже занят. Используйте переменную SERVER_PORT для другого порта"
         warn "Например: SERVER_PORT=8001 ./deploy.sh docker"
@@ -101,7 +101,6 @@ deploy_docker() {
     info "Ожидание запуска сервера..."
     sleep 3
     
-    PORT=${SERVER_PORT:-8000}
     if curl -s http://localhost:$PORT/health > /dev/null; then
         info "✓ Сервер успешно запущен!"
         info "SSE endpoint: http://localhost:$PORT/sse"
@@ -126,8 +125,8 @@ deploy_systemd() {
     # Получаем абсолютный путь к проекту
     PROJECT_DIR=$(pwd)
     USER=$(logname 2>/dev/null || echo $SUDO_USER || echo $USER)
-    PORT=${SERVER_PORT:-8000}
-    HOST=${SERVER_HOST:-0.0.0.0}
+    PORT=${SERVER_PORT:-8001}
+    HOST=${SERVER_HOST:-185.28.85.26}
     
     # Проверка порта
     if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
@@ -200,8 +199,8 @@ deploy_direct() {
     
     setup_venv
     
-    PORT=${SERVER_PORT:-8000}
-    HOST=${SERVER_HOST:-0.0.0.0}
+    PORT=${SERVER_PORT:-8001}
+    HOST=${SERVER_HOST:-185.28.85.26}
     
     # Проверка порта
     if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then

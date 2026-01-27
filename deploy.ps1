@@ -73,13 +73,13 @@ function Deploy-Docker {
         exit 1
     }
     
-    $port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8000" }
+    $port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8001" }
     
     # Проверка порта
     $portInUse = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
     if ($portInUse) {
         Write-Warn "Порт $port уже занят. Используйте переменную SERVER_PORT для другого порта"
-        Write-Warn "Например: `$env:SERVER_PORT=8001; .\deploy.ps1 docker"
+        Write-Warn "Например: `$env:SERVER_PORT=8002; .\deploy.ps1 docker"
         $continue = Read-Host "Продолжить с портом $port? (y/N)"
         if ($continue -ne "y" -and $continue -ne "Y") {
             exit 1
@@ -120,8 +120,8 @@ function Deploy-Direct {
     
     Setup-Venv
     
-    $port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8000" }
-    $host = if ($env:SERVER_HOST) { $env:SERVER_HOST } else { "0.0.0.0" }
+    $port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8001" }
+    $host = if ($env:SERVER_HOST) { $env:SERVER_HOST } else { "185.28.85.26" }
     
     # Проверка порта
     $portInUse = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
