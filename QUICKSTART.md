@@ -42,6 +42,8 @@ cp .env.example .env
 
 **Примечание:** API ключ не требуется!
 
+**Подключение к другим AI-агентам** (Claude Desktop, глобальный Cursor и т.д.) — см. **[AGENT_SETUP.md](AGENT_SETUP.md)**.
+
 ## Шаг 5: Использование
 
 В Cursor вы можете использовать:
