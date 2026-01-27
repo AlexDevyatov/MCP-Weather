@@ -77,22 +77,35 @@ deploy_docker() {
         exit 1
     fi
     
+    # Проверка порта
+    PORT=${SERVER_PORT:-8000}
+    if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        warn "Порт $PORT уже занят. Используйте переменную SERVER_PORT для другого порта"
+        warn "Например: SERVER_PORT=8001 ./deploy.sh docker"
+        read -p "Продолжить с портом $PORT? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+    
     info "Остановка существующих контейнеров..."
     docker-compose down 2>/dev/null || true
     
     info "Сборка образа..."
     docker-compose build
     
-    info "Запуск контейнера..."
-    docker-compose up -d
+    info "Запуск контейнера на порту $PORT..."
+    SERVER_PORT=$PORT docker-compose up -d
     
     info "Ожидание запуска сервера..."
     sleep 3
     
-    if curl -s http://localhost:8000/health > /dev/null; then
+    PORT=${SERVER_PORT:-8000}
+    if curl -s http://localhost:$PORT/health > /dev/null; then
         info "✓ Сервер успешно запущен!"
-        info "SSE endpoint: http://localhost:8000/sse"
-        info "Health check: http://localhost:8000/health"
+        info "SSE endpoint: http://localhost:$PORT/sse"
+        info "Health check: http://localhost:$PORT/health"
         info ""
         info "Просмотр логов: docker-compose logs -f"
         info "Остановка: docker-compose down"
@@ -113,9 +126,23 @@ deploy_systemd() {
     # Получаем абсолютный путь к проекту
     PROJECT_DIR=$(pwd)
     USER=$(logname 2>/dev/null || echo $SUDO_USER || echo $USER)
+    PORT=${SERVER_PORT:-8000}
+    HOST=${SERVER_HOST:-0.0.0.0}
+    
+    # Проверка порта
+    if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        warn "Порт $PORT уже занят. Используйте переменную SERVER_PORT для другого порта"
+        warn "Например: SERVER_PORT=8001 sudo ./deploy.sh systemd"
+        read -p "Продолжить с портом $PORT? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
     
     info "Проект: $PROJECT_DIR"
     info "Пользователь: $USER"
+    info "Порт: $PORT"
     
     # Создаем файл сервиса
     SERVICE_FILE="/etc/systemd/system/mcp-weather.service"
@@ -131,7 +158,9 @@ Type=simple
 User=$USER
 WorkingDirectory=$PROJECT_DIR
 Environment="PATH=$PROJECT_DIR/venv/bin"
-ExecStart=$PROJECT_DIR/venv/bin/python server_remote.py --host 0.0.0.0 --port 8000
+Environment="SERVER_PORT=$PORT"
+Environment="SERVER_HOST=$HOST"
+ExecStart=$PROJECT_DIR/venv/bin/python server_remote.py --host $HOST --port $PORT
 Restart=always
 RestartSec=10
 
@@ -152,7 +181,7 @@ EOF
     
     if systemctl is-active --quiet mcp-weather; then
         info "✓ Сервис успешно запущен!"
-        info "SSE endpoint: http://localhost:8000/sse"
+        info "SSE endpoint: http://localhost:$PORT/sse"
         info ""
         info "Управление:"
         info "  Статус: sudo systemctl status mcp-weather"
@@ -171,12 +200,26 @@ deploy_direct() {
     
     setup_venv
     
-    info "Запуск server_remote.py..."
+    PORT=${SERVER_PORT:-8000}
+    HOST=${SERVER_HOST:-0.0.0.0}
+    
+    # Проверка порта
+    if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        warn "Порт $PORT уже занят. Используйте переменную SERVER_PORT для другого порта"
+        warn "Например: SERVER_PORT=8001 ./deploy.sh direct"
+        read -p "Продолжить с портом $PORT? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    fi
+    
+    info "Запуск server_remote.py на $HOST:$PORT..."
     info "Для остановки нажмите Ctrl+C"
     info ""
     
     source venv/bin/activate
-    python server_remote.py --host 0.0.0.0 --port 8000
+    python server_remote.py --host $HOST --port $PORT
 }
 
 # Основная функция

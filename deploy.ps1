@@ -73,24 +73,38 @@ function Deploy-Docker {
         exit 1
     }
     
+    $port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8000" }
+    
+    # Проверка порта
+    $portInUse = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+    if ($portInUse) {
+        Write-Warn "Порт $port уже занят. Используйте переменную SERVER_PORT для другого порта"
+        Write-Warn "Например: `$env:SERVER_PORT=8001; .\deploy.ps1 docker"
+        $continue = Read-Host "Продолжить с портом $port? (y/N)"
+        if ($continue -ne "y" -and $continue -ne "Y") {
+            exit 1
+        }
+    }
+    
     Write-Info "Остановка существующих контейнеров..."
     docker-compose down 2>$null
     
     Write-Info "Сборка образа..."
     docker-compose build
     
-    Write-Info "Запуск контейнера..."
+    Write-Info "Запуск контейнера на порту $port..."
+    $env:SERVER_PORT = $port
     docker-compose up -d
     
     Write-Info "Ожидание запуска сервера..."
     Start-Sleep -Seconds 3
     
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:8000/health" -UseBasicParsing -TimeoutSec 2
+        $response = Invoke-WebRequest -Uri "http://localhost:$port/health" -UseBasicParsing -TimeoutSec 2
         if ($response.StatusCode -eq 200) {
             Write-Info "✓ Сервер успешно запущен!"
-            Write-Info "SSE endpoint: http://localhost:8000/sse"
-            Write-Info "Health check: http://localhost:8000/health"
+            Write-Info "SSE endpoint: http://localhost:$port/sse"
+            Write-Info "Health check: http://localhost:$port/health"
             Write-Info ""
             Write-Info "Просмотр логов: docker-compose logs -f"
             Write-Info "Остановка: docker-compose down"
@@ -106,11 +120,25 @@ function Deploy-Direct {
     
     Setup-Venv
     
-    Write-Info "Запуск server_remote.py..."
+    $port = if ($env:SERVER_PORT) { $env:SERVER_PORT } else { "8000" }
+    $host = if ($env:SERVER_HOST) { $env:SERVER_HOST } else { "0.0.0.0" }
+    
+    # Проверка порта
+    $portInUse = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+    if ($portInUse) {
+        Write-Warn "Порт $port уже занят. Используйте переменную SERVER_PORT для другого порта"
+        Write-Warn "Например: `$env:SERVER_PORT=8001; .\deploy.ps1 direct"
+        $continue = Read-Host "Продолжить с портом $port? (y/N)"
+        if ($continue -ne "y" -and $continue -ne "Y") {
+            exit 1
+        }
+    }
+    
+    Write-Info "Запуск server_remote.py на ${host}:${port}..."
     Write-Info "Для остановки нажмите Ctrl+C"
     Write-Info ""
     
-    & "venv\Scripts\python.exe" server_remote.py --host 0.0.0.0 --port 8000
+    & "venv\Scripts\python.exe" server_remote.py --host $host --port $port
 }
 
 # Основная функция

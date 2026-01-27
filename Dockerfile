@@ -23,10 +23,12 @@ ENV DEFAULT_LANG=ru
 ENV LOG_LEVEL=INFO
 ENV CACHE_TTL=600
 ENV REQUEST_TIMEOUT=10
+ENV SERVER_PORT=8000
+ENV SERVER_HOST=0.0.0.0
 
-# Health check
+# Health check (использует переменную SERVER_PORT)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
+    CMD python -c "import os, urllib.request; port=os.getenv('SERVER_PORT', '8000'); urllib.request.urlopen(f'http://localhost:{port}/health')" || exit 1
 
-# Запускаем сервер
-CMD ["python", "server_remote.py", "--host", "0.0.0.0", "--port", "8000"]
+# Запускаем сервер (порт берется из переменной окружения)
+CMD python server_remote.py --host ${SERVER_HOST} --port ${SERVER_PORT}

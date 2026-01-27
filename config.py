@@ -27,6 +27,12 @@ class Config:
     # Таймаут запросов к API
     REQUEST_TIMEOUT: int = int(os.getenv("REQUEST_TIMEOUT", "10"))
     
+    # Порт для удаленного сервера
+    SERVER_PORT: int = int(os.getenv("SERVER_PORT", "8000"))
+    
+    # Host для удаленного сервера
+    SERVER_HOST: str = os.getenv("SERVER_HOST", "0.0.0.0")
+    
     @classmethod
     def validate(cls) -> None:
         """Проверка наличия обязательных настроек."""

@@ -10,10 +10,20 @@
 # На сервере
 cd /path/to/MCPWeather
 source venv/bin/activate
+
+# По умолчанию на порту 8000
 python server_remote.py --host 0.0.0.0 --port 8000
+
+# Или на другом порту (если 8000 занят)
+python server_remote.py --host 0.0.0.0 --port 8001
+
+# Или через переменные окружения
+SERVER_PORT=8001 python server_remote.py
 ```
 
-Сервер будет доступен по адресу: `http://your-server:8000/sse`
+Сервер будет доступен по адресу: `http://your-server:PORT/sse`
+
+**Примечание:** Если порт 8000 занят, используйте другой порт (8001, 8080, 9000 и т.д.)
 
 ### Вариант 2: Systemd Service (рекомендуется для Linux)
 
@@ -29,6 +39,7 @@ Type=simple
 User=your-user
 WorkingDirectory=/path/to/MCPWeather
 Environment="PATH=/path/to/MCPWeather/venv/bin"
+Environment="SERVER_PORT=8000"
 ExecStart=/path/to/MCPWeather/venv/bin/python server_remote.py --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
@@ -91,8 +102,14 @@ __pycache__/
 3. **Соберите и запустите контейнер:**
 
 ```bash
+# По умолчанию на порту 8000
 docker build -t mcp-weather .
-docker run -d -p 8000:8000 --name mcp-weather --restart unless-stopped mcp-weather
+docker run -d -p 8000:8000 --name mcp-weather --restart unless-stopped \
+  -e SERVER_PORT=8000 mcp-weather
+
+# Или на другом порту (если 8000 занят)
+docker run -d -p 8001:8001 --name mcp-weather --restart unless-stopped \
+  -e SERVER_PORT=8001 mcp-weather
 ```
 
 4. **Или используйте `docker-compose.yml`:**
@@ -104,12 +121,18 @@ services:
   mcp-weather:
     build: .
     ports:
-      - "8000:8000"
+      - "${SERVER_PORT:-8000}:${SERVER_PORT:-8000}"
     restart: unless-stopped
     environment:
       - DEFAULT_LANG=ru
       - LOG_LEVEL=INFO
       - CACHE_TTL=600
+      - SERVER_PORT=${SERVER_PORT:-8000}
+```
+
+Запуск на другом порту:
+```bash
+SERVER_PORT=8001 docker-compose up -d
 ```
 
 Запуск: `docker-compose up -d`
@@ -170,6 +193,17 @@ sudo certbot --nginx -d your-domain.com
 }
 ```
 
+**Если используете другой порт:**
+```json
+{
+  "mcpServers": {
+    "weather": {
+      "url": "http://your-server:8001/sse"
+    }
+  }
+}
+```
+
 ### Claude Desktop
 
 В `claude_desktop_config.json`:
@@ -186,7 +220,7 @@ sudo certbot --nginx -d your-domain.com
 
 ### Другие MCP-клиенты
 
-Используйте SSE endpoint: `http://your-server:8000/sse`
+Используйте SSE endpoint: `http://your-server:PORT/sse` (замените PORT на ваш порт)
 
 ## 🔒 Безопасность
 
@@ -253,7 +287,19 @@ async def health():
 
 ### Сервер не запускается
 
-1. Проверьте порт: `netstat -tulpn | grep 8000`
+1. **Порт занят:** Если получаете ошибку "address already in use":
+   ```bash
+   # Проверьте, какой процесс использует порт
+   lsof -i :8000
+   # или
+   netstat -tulpn | grep 8000
+   
+   # Используйте другой порт
+   SERVER_PORT=8001 ./deploy.sh docker
+   # или
+   python server_remote.py --port 8001
+   ```
+
 2. Проверьте логи: `journalctl -u mcp-weather -n 50`
 3. Проверьте Python версию: `python --version` (должна быть 3.10+)
 
@@ -274,11 +320,14 @@ async def health():
 ### Production настройки
 
 ```bash
-# server_remote.py с несколькими workers
+# server_remote.py с несколькими workers на порту 8000
 python server_remote.py --host 0.0.0.0 --port 8000 --workers 4
 
-# Или через systemd
-ExecStart=/path/to/venv/bin/python server_remote.py --host 0.0.0.0 --port 8000 --workers 4
+# На другом порту (если 8000 занят)
+python server_remote.py --host 0.0.0.0 --port 8001 --workers 4
+
+# Или через systemd (обновите ExecStart в сервисе)
+ExecStart=/path/to/venv/bin/python server_remote.py --host 0.0.0.0 --port 8001 --workers 4
 ```
 
 ### Переменные окружения
@@ -290,6 +339,13 @@ DEFAULT_LANG=ru
 LOG_LEVEL=INFO
 CACHE_TTL=600
 REQUEST_TIMEOUT=10
+
+# Порт сервера (по умолчанию 8000)
+# Измените, если порт 8000 занят
+SERVER_PORT=8001
+
+# Host сервера (по умолчанию 0.0.0.0 - все интерфейсы)
+SERVER_HOST=0.0.0.0
 ```
 
 ## 🔗 Полезные ссылки
