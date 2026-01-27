@@ -1,4 +1,4 @@
-"""Провайдер для работы с API Яндекс Погоды."""
+"""Провайдер для работы с Open-Meteo Weather API."""
 import aiohttp
 from typing import Dict, Any, Optional, Tuple
 import logging
@@ -9,80 +9,55 @@ logger = logging.getLogger(__name__)
 
 
 class WeatherProvider:
-    """Класс для получения данных о погоде из Яндекс Погоды API."""
+    """Класс для получения данных о погоде из Open-Meteo API."""
     
-    def __init__(self, api_key: str):
-        """
-        Инициализация провайдера.
-        
-        Args:
-            api_key: API ключ Яндекс Погоды
-        """
-        self.api_key = api_key
-        self.base_url = Config.YANDEX_API_URL
+    def __init__(self):
+        """Инициализация провайдера."""
+        self.forecast_url = Config.OPEN_METEO_FORECAST_URL
+        self.geocoding_url = Config.OPEN_METEO_GEOCODING_URL
         self.timeout = aiohttp.ClientTimeout(total=Config.REQUEST_TIMEOUT)
     
-    async def get_weather(
+    async def get_current_weather(
         self,
         lat: float,
         lon: float,
-        lang: str = "ru_RU",
-        limit: int = 1,
-        hours: bool = False,
-        extra: bool = False
+        lang: str = "ru"
     ) -> Dict[str, Any]:
         """
-        Получение данных о погоде.
+        Получение текущей погоды.
         
         Args:
             lat: Широта
             lon: Долгота
-            lang: Язык ответа
-            limit: Количество дней прогноза
-            hours: Включить почасовой прогноз
-            extra: Дополнительные данные
+            lang: Язык ответа (ru, en, etc.)
             
         Returns:
-            Словарь с данными о погоде
-            
-        Raises:
-            ValueError: При ошибках API
-            aiohttp.ClientError: При ошибках сети
+            Словарь с данными о текущей погоде
         """
         params = {
-            "lat": lat,
-            "lon": lon,
-            "lang": lang,
-            "limit": limit,
-        }
-        
-        if hours:
-            params["hours"] = "true"
-        if extra:
-            params["extra"] = "true"
-        
-        headers = {
-            "X-Yandex-API-Key": self.api_key
+            "latitude": lat,
+            "longitude": lon,
+            "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_direction_10m,pressure_msl",
+            "timezone": "auto",
         }
         
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
                 async with session.get(
-                    self.base_url,
-                    params=params,
-                    headers=headers
+                    self.forecast_url,
+                    params=params
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
                         return data
-                    elif response.status == 401:
-                        raise ValueError("Неверный API ключ Яндекс Погоды")
-                    elif response.status == 403:
-                        raise ValueError("Доступ запрещён. Проверьте API ключ")
+                    elif response.status == 400:
+                        error_text = await response.text()
+                        logger.error(f"Ошибка API: {response.status} - {error_text}")
+                        raise ValueError("Неверные параметры запроса")
                     elif response.status == 429:
                         raise ValueError("Превышен лимит запросов. Попробуйте позже")
-                    elif response.status == 500:
-                        raise ValueError("Ошибка сервера Яндекс Погоды")
+                    elif response.status >= 500:
+                        raise ValueError("Ошибка сервера Open-Meteo")
                     else:
                         error_text = await response.text()
                         logger.error(f"Ошибка API: {response.status} - {error_text}")
@@ -92,31 +67,12 @@ class WeatherProvider:
             logger.error(f"Ошибка сети: {e}")
             raise ValueError(f"Ошибка сети: {str(e)}")
     
-    async def get_current_weather(
-        self,
-        lat: float,
-        lon: float,
-        lang: str = "ru_RU"
-    ) -> Dict[str, Any]:
-        """
-        Получение текущей погоды.
-        
-        Args:
-            lat: Широта
-            lon: Долгота
-            lang: Язык ответа
-            
-        Returns:
-            Словарь с данными о текущей погоде
-        """
-        return await self.get_weather(lat, lon, lang=lang, limit=1)
-    
     async def get_forecast(
         self,
         lat: float,
         lon: float,
         days: int = 3,
-        lang: str = "ru_RU"
+        lang: str = "ru"
     ) -> Dict[str, Any]:
         """
         Получение прогноза погоды.
@@ -124,20 +80,51 @@ class WeatherProvider:
         Args:
             lat: Широта
             lon: Долгота
-            days: Количество дней прогноза
+            days: Количество дней прогноза (1-16)
             lang: Язык ответа
             
         Returns:
             Словарь с данными о прогнозе
         """
-        return await self.get_weather(lat, lon, lang=lang, limit=days)
+        days = min(max(days, 1), 16)  # Open-Meteo поддерживает до 16 дней
+        
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "daily": "weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,relative_humidity_2m_max",
+            "timezone": "auto",
+            "forecast_days": days,
+        }
+        
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(
+                    self.forecast_url,
+                    params=params
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data
+                    elif response.status == 400:
+                        error_text = await response.text()
+                        logger.error(f"Ошибка API: {response.status} - {error_text}")
+                        raise ValueError("Неверные параметры запроса")
+                    elif response.status == 429:
+                        raise ValueError("Превышен лимит запросов. Попробуйте позже")
+                    elif response.status >= 500:
+                        raise ValueError("Ошибка сервера Open-Meteo")
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Ошибка API: {response.status} - {error_text}")
+                        raise ValueError(f"Ошибка API: {response.status}")
+        
+        except aiohttp.ClientError as e:
+            logger.error(f"Ошибка сети: {e}")
+            raise ValueError(f"Ошибка сети: {str(e)}")
     
     async def geocode_location(self, city_name: str) -> Optional[Tuple[float, float, str]]:
         """
-        Поиск координат по названию города.
-        
-        Примечание: Яндекс Погода API не предоставляет геокодинг.
-        Используется упрощённая реализация с популярными городами.
+        Поиск координат по названию города через Open-Meteo Geocoding API.
         
         Args:
             city_name: Название города
@@ -145,34 +132,42 @@ class WeatherProvider:
         Returns:
             Кортеж (широта, долгота, полное название) или None
         """
-        # База популярных городов России
-        cities = {
-            "москва": (55.75396, 37.620393, "Москва"),
-            "санкт-петербург": (59.9342802, 30.3350986, "Санкт-Петербург"),
-            "новосибирск": (55.0083526, 82.9357327, "Новосибирск"),
-            "екатеринбург": (56.8430993, 60.6454086, "Екатеринбург"),
-            "казань": (55.8304307, 49.0660806, "Казань"),
-            "нижний новгород": (56.2965039, 43.936059, "Нижний Новгород"),
-            "челябинск": (55.1644419, 61.4368432, "Челябинск"),
-            "самара": (53.2000663, 50.15, "Самара"),
-            "омск": (54.9884806, 73.3242362, "Омск"),
-            "ростов-на-дону": (47.2357137, 39.701505, "Ростов-на-Дону"),
-            "уфа": (54.734768, 55.9578387, "Уфа"),
-            "красноярск": (56.01839, 92.86717, "Красноярск"),
-            "воронеж": (51.67204, 39.1843, "Воронеж"),
-            "пермь": (58.01046, 56.25017, "Пермь"),
-            "волгоград": (48.71939, 44.50183, "Волгоград"),
+        params = {
+            "name": city_name,
+            "count": 1,
+            "language": "ru",
+            "format": "json"
         }
         
-        city_lower = city_name.lower().strip()
+        try:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(
+                    self.geocoding_url,
+                    params=params
+                ) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        results = data.get("results", [])
+                        if results:
+                            result = results[0]
+                            lat = result.get("latitude")
+                            lon = result.get("longitude")
+                            name = result.get("name", city_name)
+                            country = result.get("country", "")
+                            admin1 = result.get("admin1", "")  # Регион/область
+                            
+                            full_name = name
+                            if admin1:
+                                full_name = f"{name}, {admin1}"
+                            if country:
+                                full_name = f"{name}, {country}"
+                            
+                            return (lat, lon, full_name)
+                        return None
+                    else:
+                        logger.warning(f"Ошибка геокодинга: {response.status}")
+                        return None
         
-        # Прямое совпадение
-        if city_lower in cities:
-            return cities[city_lower]
-        
-        # Частичное совпадение
-        for key, value in cities.items():
-            if city_lower in key or key in city_lower:
-                return value
-        
-        return None
+        except aiohttp.ClientError as e:
+            logger.error(f"Ошибка сети при геокодинге: {e}")
+            return None

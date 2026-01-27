@@ -1,84 +1,85 @@
 """Форматирование данных о погоде."""
-from typing import Dict, Any, List
+from typing import Dict, Any
 from datetime import datetime
 
 
 class WeatherFormatter:
     """Класс для форматирования данных о погоде."""
     
-    # Словарь условий погоды
-    CONDITIONS = {
-        "clear": "ясно",
-        "partly-cloudy": "малооблачно",
-        "cloudy": "облачно с прояснениями",
-        "overcast": "пасмурно",
-        "drizzle": "морось",
-        "light-rain": "небольшой дождь",
-        "rain": "дождь",
-        "moderate-rain": "умеренно сильный дождь",
-        "heavy-rain": "сильный дождь",
-        "continuous-heavy-rain": "длительный сильный дождь",
-        "showers": "ливень",
-        "wet-snow": "дождь со снегом",
-        "light-snow": "небольшой снег",
-        "snow": "снег",
-        "snow-showers": "снегопад",
-        "hail": "град",
-        "thunderstorm": "гроза",
-        "thunderstorm-with-rain": "дождь с грозой",
-        "thunderstorm-with-hail": "гроза с градом",
+    # WMO Weather interpretation codes (Open-Meteo использует эти коды)
+    # Источник: https://www.nodc.noaa.gov/archive/arc0021/0002199/1.1/data/0-data/HTML/WMO-CODE/WMO4677.HTM
+    WMO_WEATHER_CODES = {
+        0: ("ясно", "☀️"),
+        1: ("преимущественно ясно", "🌤️"),
+        2: ("переменная облачность", "⛅"),
+        3: ("пасмурно", "☁️"),
+        45: ("туман", "🌫️"),
+        48: ("осаждающийся иней туман", "🌫️"),
+        51: ("лёгкая морось", "🌦️"),
+        53: ("умеренная морось", "🌦️"),
+        55: ("сильная морось", "🌦️"),
+        56: ("лёгкая ледяная морось", "🌨️"),
+        57: ("сильная ледяная морось", "🌨️"),
+        61: ("небольшой дождь", "🌧️"),
+        63: ("умеренный дождь", "🌧️"),
+        65: ("сильный дождь", "🌧️"),
+        66: ("лёгкий ледяной дождь", "🌨️"),
+        67: ("сильный ледяной дождь", "🌨️"),
+        71: ("небольшой снег", "❄️"),
+        73: ("умеренный снег", "❄️"),
+        75: ("сильный снег", "❄️"),
+        77: ("снежные зёрна", "❄️"),
+        80: ("небольшой ливень", "🌧️"),
+        81: ("умеренный ливень", "🌧️"),
+        82: ("сильный ливень", "🌧️"),
+        85: ("небольшой снегопад", "❄️"),
+        86: ("сильный снегопад", "❄️"),
+        95: ("гроза", "⛈️"),
+        96: ("гроза с небольшим градом", "⛈️"),
+        99: ("гроза с сильным градом", "⛈️"),
     }
     
-    # Словарь направлений ветра
+    # Направления ветра (градусы)
     WIND_DIRECTIONS = {
-        "nw": "северо-западный",
-        "n": "северный",
-        "ne": "северо-восточный",
-        "e": "восточный",
-        "se": "юго-восточный",
-        "s": "южный",
-        "sw": "юго-западный",
-        "w": "западный",
-        "c": "штиль",
-    }
-    
-    # Эмодзи для условий
-    CONDITION_EMOJIS = {
-        "clear": "☀️",
-        "partly-cloudy": "⛅",
-        "cloudy": "☁️",
-        "overcast": "☁️",
-        "drizzle": "🌦️",
-        "light-rain": "🌦️",
-        "rain": "🌧️",
-        "moderate-rain": "🌧️",
-        "heavy-rain": "🌧️",
-        "continuous-heavy-rain": "🌧️",
-        "showers": "🌧️",
-        "wet-snow": "🌨️",
-        "light-snow": "🌨️",
-        "snow": "❄️",
-        "snow-showers": "❄️",
-        "hail": "🌨️",
-        "thunderstorm": "⛈️",
-        "thunderstorm-with-rain": "⛈️",
-        "thunderstorm-with-hail": "⛈️",
+        (0, 22.5): "северный",
+        (22.5, 67.5): "северо-восточный",
+        (67.5, 112.5): "восточный",
+        (112.5, 157.5): "юго-восточный",
+        (157.5, 202.5): "южный",
+        (202.5, 247.5): "юго-западный",
+        (247.5, 292.5): "западный",
+        (292.5, 337.5): "северо-западный",
+        (337.5, 360): "северный",
     }
     
     @classmethod
-    def translate_condition(cls, condition: str) -> str:
-        """Перевод условия погоды на русский."""
-        return cls.CONDITIONS.get(condition, condition)
+    def get_weather_condition(cls, weather_code: int) -> tuple[str, str]:
+        """
+        Получение условия погоды по WMO коду.
+        
+        Args:
+            weather_code: WMO Weather interpretation code
+            
+        Returns:
+            Кортеж (название, эмодзи)
+        """
+        return cls.WMO_WEATHER_CODES.get(weather_code, ("неизвестно", "🌤️"))
     
     @classmethod
-    def translate_wind_direction(cls, direction: str) -> str:
-        """Перевод направления ветра на русский."""
-        return cls.WIND_DIRECTIONS.get(direction.lower(), direction)
-    
-    @classmethod
-    def get_condition_emoji(cls, condition: str) -> str:
-        """Получение эмодзи для условия погоды."""
-        return cls.CONDITION_EMOJIS.get(condition, "🌤️")
+    def get_wind_direction(cls, degrees: float) -> str:
+        """
+        Получение направления ветра по градусам.
+        
+        Args:
+            degrees: Направление в градусах (0-360)
+            
+        Returns:
+            Название направления
+        """
+        for (start, end), direction in cls.WIND_DIRECTIONS.items():
+            if start <= degrees < end or (start > end and (degrees >= start or degrees < end)):
+                return direction
+        return "неизвестно"
     
     @classmethod
     def format_current_weather(cls, data: Dict[str, Any]) -> str:
@@ -86,39 +87,50 @@ class WeatherFormatter:
         Форматирование текущей погоды в красивый текст.
         
         Args:
-            data: Данные о погоде из API
+            data: Данные о погоде из Open-Meteo API
             
         Returns:
             Отформатированная строка
         """
-        fact = data.get("fact", {})
-        info = data.get("info", {})
+        current = data.get("current", {})
+        latitude = data.get("latitude", 0)
+        longitude = data.get("longitude", 0)
         
-        location = info.get("tzinfo", {}).get("name", "Неизвестно")
-        temp = fact.get("temp", 0)
-        feels_like = fact.get("feels_like", 0)
-        condition = cls.translate_condition(fact.get("condition", ""))
-        humidity = fact.get("humidity", 0)
-        pressure_mm = fact.get("pressure_mm", 0)
-        wind_speed = fact.get("wind_speed", 0)
-        wind_dir = cls.translate_wind_direction(fact.get("wind_dir", ""))
-        icon = fact.get("icon", "")
-        emoji = cls.get_condition_emoji(fact.get("condition", ""))
+        # Формируем название местоположения
+        location = f"{latitude:.2f}°N, {longitude:.2f}°E"
+        
+        temp = round(current.get("temperature_2m", 0))
+        weather_code = current.get("weather_code", 0)
+        humidity = current.get("relative_humidity_2m", 0)
+        pressure_hpa = current.get("pressure_msl", 0)
+        pressure_mm = round(pressure_hpa * 0.750062) if pressure_hpa else 0
+        wind_speed = current.get("wind_speed_10m", 0)
+        wind_direction_deg = current.get("wind_direction_10m", 0)
+        wind_dir = cls.get_wind_direction(wind_direction_deg)
+        
+        condition, emoji = cls.get_weather_condition(weather_code)
         
         # Время обновления
-        now = datetime.now()
-        updated_at = now.strftime("%H:%M")
+        time_str = current.get("time", "")
+        if time_str:
+            try:
+                time_obj = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
+                updated_at = time_obj.strftime("%H:%M")
+            except:
+                updated_at = datetime.now().strftime("%H:%M")
+        else:
+            updated_at = datetime.now().strftime("%H:%M")
         
         # Рекомендации
-        recommendation = cls._get_recommendation(temp, condition, fact.get("prec_type", 0))
+        recommendation = cls._get_recommendation(temp, condition, weather_code)
         
         result = f"""{emoji} Погода в {location}
 ━━━━━━━━━━━━━━━━━━━━━━━
-🌡️  Температура: {temp}°C (ощущается как {feels_like}°C)
+🌡️  Температура: {temp}°C
 ☁️  Условия: {condition}
 💧 Влажность: {humidity}%
 📊 Давление: {pressure_mm} мм рт.ст.
-💨 Ветер: {wind_speed} м/с, {wind_dir}
+💨 Ветер: {wind_speed:.1f} м/с, {wind_dir}
 🕐 Обновлено: {updated_at}
 
 💡 Рекомендация: {recommendation}"""
@@ -131,59 +143,63 @@ class WeatherFormatter:
         Форматирование прогноза погоды.
         
         Args:
-            data: Данные о прогнозе из API
+            data: Данные о прогнозе из Open-Meteo API
             days: Количество дней
             
         Returns:
             Отформатированная строка
         """
-        info = data.get("info", {})
-        forecasts = data.get("forecasts", [])[:days]
+        daily = data.get("daily", {})
+        latitude = data.get("latitude", 0)
+        longitude = data.get("longitude", 0)
         
-        location = info.get("tzinfo", {}).get("name", "Неизвестно")
+        location = f"{latitude:.2f}°N, {longitude:.2f}°E"
         
-        result = f"📅 Прогноз погоды в {location} на {len(forecasts)} дней\n"
+        times = daily.get("time", [])[:days]
+        weather_codes = daily.get("weather_code", [])[:days]
+        temp_max = daily.get("temperature_2m_max", [])[:days]
+        temp_min = daily.get("temperature_2m_min", [])[:days]
+        precipitation = daily.get("precipitation_sum", [])[:days]
+        humidity = daily.get("relative_humidity_2m_max", [])[:days]
+        
+        result = f"📅 Прогноз погоды в {location} на {len(times)} дней\n"
         result += "━━━━━━━━━━━━━━━━━━━━━━━\n\n"
         
-        for forecast in forecasts:
-            date_str = forecast.get("date", "")
-            parts = forecast.get("parts", {})
-            day = parts.get("day", {})
-            
+        for i, time_str in enumerate(times):
             # Парсинг даты
             try:
-                date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                date_obj = datetime.fromisoformat(time_str)
                 date_formatted = date_obj.strftime("%d.%m.%Y")
                 weekday = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"][date_obj.weekday()]
             except:
-                date_formatted = date_str
+                date_formatted = time_str
                 weekday = ""
             
-            temp_min = day.get("temp_min", 0)
-            temp_max = day.get("temp_max", 0)
-            condition = cls.translate_condition(day.get("condition", ""))
-            prec_mm = day.get("prec_mm", 0)
-            humidity = day.get("humidity", 0)
-            emoji = cls.get_condition_emoji(day.get("condition", ""))
+            code = weather_codes[i] if i < len(weather_codes) else 0
+            condition, emoji = cls.get_weather_condition(code)
+            temp_max_val = round(temp_max[i]) if i < len(temp_max) else 0
+            temp_min_val = round(temp_min[i]) if i < len(temp_min) else 0
+            prec_mm = precipitation[i] if i < len(precipitation) else 0
+            humidity_val = round(humidity[i]) if i < len(humidity) else 0
             
             result += f"{emoji} {date_formatted} ({weekday})\n"
-            result += f"   🌡️  {temp_min}°C / {temp_max}°C\n"
+            result += f"   🌡️  {temp_min_val}°C / {temp_max_val}°C\n"
             result += f"   ☁️  {condition}\n"
             if prec_mm > 0:
-                result += f"   🌧️  Осадки: {prec_mm} мм\n"
-            result += f"   💧 Влажность: {humidity}%\n\n"
+                result += f"   🌧️  Осадки: {prec_mm:.1f} мм\n"
+            result += f"   💧 Влажность: {humidity_val}%\n\n"
         
         return result.strip()
     
     @classmethod
-    def _get_recommendation(cls, temp: int, condition: str, prec_type: int) -> str:
+    def _get_recommendation(cls, temp: float, condition: str, weather_code: int) -> str:
         """
         Генерация рекомендации на основе погоды.
         
         Args:
             temp: Температура
             condition: Условия погоды
-            prec_type: Тип осадков (0 - нет, 1 - дождь, 2 - дождь со снегом, 3 - снег)
+            weather_code: WMO код погоды
             
         Returns:
             Рекомендация
@@ -204,12 +220,12 @@ class WeatherFormatter:
         else:
             recommendations.append("Жарко. Лёгкая одежда")
         
-        # Рекомендации по осадкам
-        if prec_type == 1 or "дождь" in condition.lower() or "ливень" in condition.lower():
+        # Рекомендации по осадкам (коды 51-67, 80-82, 95-99)
+        if weather_code in [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82]:
             recommendations.append("и обязательно возьмите зонт! ☂️")
-        elif prec_type == 3 or "снег" in condition.lower():
+        elif weather_code in [71, 73, 75, 77, 85, 86]:
             recommendations.append("и наденьте тёплую обувь")
-        elif prec_type == 2:
-            recommendations.append("и будьте осторожны на дорогах")
+        elif weather_code in [95, 96, 99]:
+            recommendations.append("и будьте осторожны на улице")
         
         return " ".join(recommendations) if recommendations else "Обычная погода"

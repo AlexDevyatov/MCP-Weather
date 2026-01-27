@@ -1,6 +1,5 @@
 """Конфигурация MCP-сервера погоды."""
 import os
-from typing import Optional
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -9,14 +8,12 @@ load_dotenv()
 class Config:
     """Настройки приложения."""
     
-    # API ключ Яндекс Погоды
-    YANDEX_API_KEY: str = os.getenv("YANDEX_API_KEY", "")
-    
-    # URL API Яндекс Погоды
-    YANDEX_API_URL: str = "https://api.weather.yandex.ru/v2/forecast"
+    # URL API Open-Meteo
+    OPEN_METEO_FORECAST_URL: str = "https://api.open-meteo.com/v1/forecast"
+    OPEN_METEO_GEOCODING_URL: str = "https://geocoding-api.open-meteo.com/v1/search"
     
     # Язык по умолчанию
-    DEFAULT_LANG: str = os.getenv("DEFAULT_LANG", "ru_RU")
+    DEFAULT_LANG: str = os.getenv("DEFAULT_LANG", "ru")
     
     # Местоположение по умолчанию (Москва)
     DEFAULT_LOCATION: str = os.getenv("DEFAULT_LOCATION", "55.75396,37.620393")
@@ -33,8 +30,5 @@ class Config:
     @classmethod
     def validate(cls) -> None:
         """Проверка наличия обязательных настроек."""
-        if not cls.YANDEX_API_KEY:
-            raise ValueError(
-                "YANDEX_API_KEY не установлен. "
-                "Установите его в переменных окружения или в .env файле."
-            )
+        # Open-Meteo не требует API ключа, поэтому валидация не нужна
+        pass

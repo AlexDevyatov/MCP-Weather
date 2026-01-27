@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Инициализация компонентов
 Config.validate()
-weather_provider = WeatherProvider(Config.YANDEX_API_KEY)
+weather_provider = WeatherProvider()
 weather_formatter = WeatherFormatter()
 weather_cache = WeatherCache(ttl=Config.CACHE_TTL)
 

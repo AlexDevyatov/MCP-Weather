@@ -5,8 +5,7 @@
       "args": ["server.py"],
       "cwd": "${workspaceFolder}",
       "env": {
-        "YANDEX_API_KEY": "${env:YANDEX_API_KEY}",
-        "DEFAULT_LANG": "${env:DEFAULT_LANG:ru_RU}",
+        "DEFAULT_LANG": "${env:DEFAULT_LANG:ru}",
         "DEFAULT_LOCATION": "${env:DEFAULT_LOCATION:55.75396,37.620393}",
         "CACHE_TTL": "${env:CACHE_TTL:600}",
         "LOG_LEVEL": "${env:LOG_LEVEL:INFO}",
