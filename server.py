@@ -66,7 +66,7 @@ async def list_tools() -> list[types.Tool]:
         types.Tool(
             name="get_current_weather",
             description="Получение текущей погоды для указанного местоположения",
-            input_schema={
+            inputSchema={
                 "type": "object",
                 "properties": {
                     "location": {
@@ -87,7 +87,7 @@ async def list_tools() -> list[types.Tool]:
         types.Tool(
             name="get_weather_forecast",
             description="Получение прогноза погоды на несколько дней",
-            input_schema={
+            inputSchema={
                 "type": "object",
                 "properties": {
                     "days": {
@@ -115,7 +115,7 @@ async def list_tools() -> list[types.Tool]:
         types.Tool(
             name="search_location",
             description="Поиск координат по названию города",
-            input_schema={
+            inputSchema={
                 "type": "object",
                 "properties": {
                     "city_name": {
