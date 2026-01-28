@@ -36,179 +36,94 @@ curl -N http://localhost:9001/sse
 
 ## 📨 Тестирование MCP протокола
 
-MCP работает через JSON-RPC сообщения. Вот как можно протестировать:
+**Важно:** MCP через SSE транспорт требует установления SSE соединения и использования правильного MCP клиента. Прямые HTTP POST запросы к `/messages/` не работают без активного SSE соединения.
 
-### 3. Инициализация MCP сессии
+### 3. Использование Python скрипта (рекомендуется)
 
-```bash
-curl -X POST http://localhost:9001/messages/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2024-11-05",
-      "capabilities": {},
-      "clientInfo": {
-        "name": "test-client",
-        "version": "1.0.0"
-      }
-    }
-  }'
-```
-
-**Ожидаемый результат:** JSON ответ с информацией о сервере и доступных инструментах.
-
-### 4. Получение списка инструментов
+Самый простой способ - использовать готовый тестовый скрипт:
 
 ```bash
-curl -X POST http://localhost:9001/messages/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 2,
-    "method": "tools/list"
-  }'
+# Установите зависимости
+pip install mcp httpx
+
+# Запустите тест
+python test_mcp.py --port 9001
 ```
 
-**Ожидаемый результат:** Список доступных инструментов:
-- `get_current_weather`
-- `get_weather_forecast`
-- `search_location`
+Скрипт автоматически:
+- Проверит health check
+- Установит SSE соединение
+- Получит список инструментов
+- Протестирует все инструменты
 
-### 5. Вызов инструмента: Текущая погода
+### 4. Программное тестирование через MCP SDK
 
-```bash
-curl -X POST http://localhost:9001/messages/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "tools/call",
-    "params": {
-      "name": "get_current_weather",
-      "arguments": {
-        "location": "Москва"
-      }
-    }
-  }'
+Если хотите написать свой код для тестирования:
+
+```python
+import asyncio
+from mcp import ClientSession
+from mcp.client.sse import sse_client
+
+async def test_mcp():
+    sse_url = "http://localhost:9001/sse"
+    
+    async with sse_client(sse_url) as (read, write):
+        async with ClientSession(read, write) as session:
+            # Инициализация
+            await session.initialize()
+            
+            # Получение списка инструментов
+            tools = await session.list_tools()
+            print("Инструменты:", [t.name for t in tools.tools])
+            
+            # Вызов инструмента
+            result = await session.call_tool(
+                "get_current_weather",
+                {"location": "Москва"}
+            )
+            print("Результат:", result.content[0].text)
+
+asyncio.run(test_mcp())
 ```
 
-**Ожидаемый результат:** JSON с данными о текущей погоде в Москве.
+### 5. Альтернатива: Тестирование через curl (ограничено)
 
-### 6. Вызов инструмента: Прогноз погоды
+**Примечание:** Прямые POST запросы к `/messages/` требуют активного SSE соединения с `session_id`. Это сложно сделать через curl. Рекомендуется использовать Python скрипт выше.
 
-```bash
-curl -X POST http://localhost:9001/messages/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 4,
-    "method": "tools/call",
-    "params": {
-      "name": "get_weather_forecast",
-      "arguments": {
-        "location": "Санкт-Петербург",
-        "days": 3
-      }
-    }
-  }'
-```
+Если все же нужно протестировать через curl, сначала нужно:
+1. Установить SSE соединение через `curl -N http://localhost:9001/sse`
+2. Получить `session_id` из SSE потока
+3. Использовать этот `session_id` в POST запросах к `/messages/`
 
-### 7. Поиск местоположения
-
-```bash
-curl -X POST http://localhost:9001/messages/ \
-  -H "Content-Type: application/json" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 5,
-    "method": "tools/call",
-    "params": {
-      "name": "search_location",
-      "arguments": {
-        "city_name": "Новосибирск"
-      }
-    }
-  }'
-```
+Это сложно и не рекомендуется. Используйте Python скрипт `test_mcp.py`.
 
 ---
 
-## 🐍 Альтернатива: Python скрипт для тестирования
+## 🐍 Python скрипт для тестирования
 
-Создайте файл `test_mcp.py`:
+В проекте уже есть готовый скрипт `test_mcp.py`! Просто запустите:
 
-```python
-#!/usr/bin/env python3
-"""Простой скрипт для тестирования MCP Weather сервера."""
-import asyncio
-import httpx
-import json
-
-MCP_URL = "http://localhost:9001"
-
-async def test_mcp():
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        # 1. Health check
-        print("1. Health check...")
-        response = await client.get(f"{MCP_URL}/health")
-        print(f"   Status: {response.status_code}")
-        print(f"   Response: {response.text}\n")
-        
-        # 2. Получение списка инструментов
-        print("2. Получение списка инструментов...")
-        response = await client.post(
-            f"{MCP_URL}/messages/",
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/list"
-            }
-        )
-        print(f"   Status: {response.status_code}")
-        data = response.json()
-        if "result" in data and "tools" in data["result"]:
-            tools = data["result"]["tools"]
-            print(f"   Найдено инструментов: {len(tools)}")
-            for tool in tools:
-                print(f"   - {tool['name']}: {tool['description']}")
-        print()
-        
-        # 3. Вызов инструмента погоды
-        print("3. Получение текущей погоды в Москве...")
-        response = await client.post(
-            f"{MCP_URL}/messages/",
-            json={
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "tools/call",
-                "params": {
-                    "name": "get_current_weather",
-                    "arguments": {
-                        "location": "Москва"
-                    }
-                }
-            }
-        )
-        print(f"   Status: {response.status_code}")
-        data = response.json()
-        if "result" in data:
-            content = data["result"].get("content", [])
-            if content and len(content) > 0:
-                print(f"   Результат:\n{content[0].get('text', '')}")
-        print()
-
-if __name__ == "__main__":
-    asyncio.run(test_mcp())
-```
-
-Запуск:
 ```bash
-pip install httpx
-python test_mcp.py
+# Установите зависимости (если еще не установлены)
+pip install mcp httpx
+
+# Запустите тест
+python test_mcp.py --port 9001
+
+# Или для удаленного сервера
+python test_mcp.py --host your-server.com --port 9001
 ```
+
+Скрипт автоматически:
+- ✅ Проверит health check
+- ✅ Установит SSE соединение через MCP SDK
+- ✅ Получит список инструментов
+- ✅ Протестирует получение текущей погоды
+- ✅ Протестирует получение прогноза
+- ✅ Протестирует поиск местоположения
+
+**Примечание:** Скрипт использует официальный MCP Python SDK, который правильно обрабатывает SSE транспорт и session_id.
 
 ---
 

@@ -1,17 +1,29 @@
 #!/usr/bin/env python3
 """
-Простой скрипт для тестирования MCP Weather сервера через HTTP API.
+Простой скрипт для тестирования MCP Weather сервера через SSE транспорт.
 
 Использование:
     python test_mcp.py
     python test_mcp.py --port 9001
     python test_mcp.py --host your-server.com --port 9001
+
+Требования:
+    pip install mcp httpx
 """
 import asyncio
 import argparse
 import httpx
 import json
 from typing import Optional
+
+try:
+    from mcp import ClientSession
+    from mcp.client.sse import sse_client
+    MCP_AVAILABLE = True
+except ImportError:
+    MCP_AVAILABLE = False
+    print("⚠️  MCP SDK не установлен. Установите: pip install mcp")
+    print("   Будет использован упрощенный режим тестирования (только health check)")
 
 
 async def test_health(client: httpx.AsyncClient, base_url: str) -> bool:
@@ -31,196 +43,140 @@ async def test_health(client: httpx.AsyncClient, base_url: str) -> bool:
         return False
 
 
-async def test_list_tools(client: httpx.AsyncClient, base_url: str) -> Optional[list]:
-    """Тест получения списка инструментов."""
-    print("\n🔍 Тест 2: Список инструментов")
-    print(f"   POST {base_url}/messages/")
+async def test_list_tools_sse(sse_url: str) -> Optional[list]:
+    """Тест получения списка инструментов через SSE."""
+    if not MCP_AVAILABLE:
+        print("   ⚠️  Требуется MCP SDK для этого теста")
+        return None
+        
+    print("\n🔍 Тест 2: Список инструментов (через SSE)")
+    print(f"   Подключение к {sse_url}")
     try:
-        response = await client.post(
-            f"{base_url}/messages/",
-            json={
-                "jsonrpc": "2.0",
-                "id": 1,
-                "method": "tools/list"
-            },
-            timeout=10.0
-        )
-        
-        if response.status_code != 200:
-            print(f"   ❌ Ошибка HTTP: {response.status_code}")
-            print(f"   Ответ: {response.text}")
-            return None
-        
-        data = response.json()
-        
-        if "error" in data:
-            print(f"   ❌ Ошибка MCP: {data['error']}")
-            return None
-        
-        if "result" in data and "tools" in data["result"]:
-            tools = data["result"]["tools"]
-            print(f"   ✅ Найдено инструментов: {len(tools)}")
-            for tool in tools:
-                print(f"      • {tool['name']}: {tool['description']}")
-            return tools
-        else:
-            print(f"   ⚠️  Неожиданный формат ответа: {json.dumps(data, indent=2, ensure_ascii=False)}")
-            return None
-            
+        async with sse_client(sse_url) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                
+                result = await session.list_tools()
+                
+                if result.tools:
+                    print(f"   ✅ Найдено инструментов: {len(result.tools)}")
+                    for tool in result.tools:
+                        print(f"      • {tool.name}: {tool.description}")
+                    return result.tools
+                else:
+                    print("   ⚠️  Инструменты не найдены")
+                    return []
+                    
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
 
-async def test_get_weather(client: httpx.AsyncClient, base_url: str, location: str = "Москва") -> bool:
-    """Тест получения текущей погоды."""
+async def test_get_weather_sse(sse_url: str, location: str = "Москва") -> bool:
+    """Тест получения текущей погоды через SSE."""
+    if not MCP_AVAILABLE:
+        print("   ⚠️  Требуется MCP SDK для этого теста")
+        return False
+        
     print(f"\n🔍 Тест 3: Получение текущей погоды ({location})")
-    print(f"   POST {base_url}/messages/")
+    print(f"   Подключение к {sse_url}")
     try:
-        response = await client.post(
-            f"{base_url}/messages/",
-            json={
-                "jsonrpc": "2.0",
-                "id": 2,
-                "method": "tools/call",
-                "params": {
-                    "name": "get_current_weather",
-                    "arguments": {
-                        "location": location
-                    }
-                }
-            },
-            timeout=15.0
-        )
-        
-        if response.status_code != 200:
-            print(f"   ❌ Ошибка HTTP: {response.status_code}")
-            print(f"   Ответ: {response.text}")
-            return False
-        
-        data = response.json()
-        
-        if "error" in data:
-            print(f"   ❌ Ошибка MCP: {json.dumps(data['error'], indent=2, ensure_ascii=False)}")
-            return False
-        
-        if "result" in data:
-            content = data["result"].get("content", [])
-            if content and len(content) > 0:
-                weather_text = content[0].get("text", "")
-                print(f"   ✅ Успешно получена погода:")
-                print(f"   {'─' * 60}")
-                # Выводим с отступами для читаемости
-                for line in weather_text.split("\n"):
-                    print(f"   {line}")
-                print(f"   {'─' * 60}")
-                return True
-            else:
-                print(f"   ⚠️  Пустой ответ")
-                return False
-        else:
-            print(f"   ⚠️  Неожиданный формат ответа")
-            print(f"   {json.dumps(data, indent=2, ensure_ascii=False)}")
-            return False
-            
+        async with sse_client(sse_url) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                
+                result = await session.call_tool(
+                    "get_current_weather",
+                    {"location": location}
+                )
+                
+                if result.content:
+                    weather_text = result.content[0].text if hasattr(result.content[0], 'text') else str(result.content[0])
+                    print(f"   ✅ Успешно получена погода:")
+                    print(f"   {'─' * 60}")
+                    for line in weather_text.split("\n"):
+                        print(f"   {line}")
+                    print(f"   {'─' * 60}")
+                    return True
+                else:
+                    print("   ⚠️  Пустой ответ")
+                    return False
+                    
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
-async def test_forecast(client: httpx.AsyncClient, base_url: str, location: str = "Санкт-Петербург", days: int = 3) -> bool:
-    """Тест получения прогноза погоды."""
+async def test_forecast_sse(sse_url: str, location: str = "Санкт-Петербург", days: int = 3) -> bool:
+    """Тест получения прогноза погоды через SSE."""
+    if not MCP_AVAILABLE:
+        print("   ⚠️  Требуется MCP SDK для этого теста")
+        return False
+        
     print(f"\n🔍 Тест 4: Получение прогноза погоды ({location}, {days} дней)")
-    print(f"   POST {base_url}/messages/")
+    print(f"   Подключение к {sse_url}")
     try:
-        response = await client.post(
-            f"{base_url}/messages/",
-            json={
-                "jsonrpc": "2.0",
-                "id": 3,
-                "method": "tools/call",
-                "params": {
-                    "name": "get_weather_forecast",
-                    "arguments": {
-                        "location": location,
-                        "days": days
-                    }
-                }
-            },
-            timeout=15.0
-        )
-        
-        if response.status_code != 200:
-            print(f"   ❌ Ошибка HTTP: {response.status_code}")
-            return False
-        
-        data = response.json()
-        
-        if "error" in data:
-            print(f"   ❌ Ошибка MCP: {json.dumps(data['error'], indent=2, ensure_ascii=False)}")
-            return False
-        
-        if "result" in data:
-            content = data["result"].get("content", [])
-            if content and len(content) > 0:
-                forecast_text = content[0].get("text", "")
-                print(f"   ✅ Успешно получен прогноз:")
-                print(f"   {'─' * 60}")
-                for line in forecast_text.split("\n")[:10]:  # Первые 10 строк
-                    print(f"   {line}")
-                if len(forecast_text.split("\n")) > 10:
-                    print(f"   ... (показаны первые 10 строк)")
-                print(f"   {'─' * 60}")
-                return True
+        async with sse_client(sse_url) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                
+                result = await session.call_tool(
+                    "get_weather_forecast",
+                    {"location": location, "days": days}
+                )
+                
+                if result.content:
+                    forecast_text = result.content[0].text if hasattr(result.content[0], 'text') else str(result.content[0])
+                    print(f"   ✅ Успешно получен прогноз:")
+                    print(f"   {'─' * 60}")
+                    for line in forecast_text.split("\n")[:10]:
+                        print(f"   {line}")
+                    if len(forecast_text.split("\n")) > 10:
+                        print(f"   ... (показаны первые 10 строк)")
+                    print(f"   {'─' * 60}")
+                    return True
         return False
             
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
-async def test_search_location(client: httpx.AsyncClient, base_url: str, city: str = "Новосибирск") -> bool:
-    """Тест поиска местоположения."""
+async def test_search_location_sse(sse_url: str, city: str = "Новосибирск") -> bool:
+    """Тест поиска местоположения через SSE."""
+    if not MCP_AVAILABLE:
+        print("   ⚠️  Требуется MCP SDK для этого теста")
+        return False
+        
     print(f"\n🔍 Тест 5: Поиск местоположения ({city})")
-    print(f"   POST {base_url}/messages/")
+    print(f"   Подключение к {sse_url}")
     try:
-        response = await client.post(
-            f"{base_url}/messages/",
-            json={
-                "jsonrpc": "2.0",
-                "id": 4,
-                "method": "tools/call",
-                "params": {
-                    "name": "search_location",
-                    "arguments": {
-                        "city_name": city
-                    }
-                }
-            },
-            timeout=15.0
-        )
-        
-        if response.status_code != 200:
-            print(f"   ❌ Ошибка HTTP: {response.status_code}")
-            return False
-        
-        data = response.json()
-        
-        if "error" in data:
-            print(f"   ❌ Ошибка MCP: {json.dumps(data['error'], indent=2, ensure_ascii=False)}")
-            return False
-        
-        if "result" in data:
-            content = data["result"].get("content", [])
-            if content and len(content) > 0:
-                location_text = content[0].get("text", "")
-                print(f"   ✅ Результат поиска:")
-                print(f"   {location_text}")
-                return True
+        async with sse_client(sse_url) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                
+                result = await session.call_tool(
+                    "search_location",
+                    {"city_name": city}
+                )
+                
+                if result.content:
+                    location_text = result.content[0].text if hasattr(result.content[0], 'text') else str(result.content[0])
+                    print(f"   ✅ Результат поиска:")
+                    print(f"   {location_text}")
+                    return True
         return False
             
     except Exception as e:
         print(f"   ❌ Ошибка: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -234,11 +190,16 @@ async def main():
     args = parser.parse_args()
     
     base_url = f"http://{args.host}:{args.port}"
+    sse_url = f"{base_url}/sse"
     
     print("=" * 70)
     print("🧪 Тестирование MCP Weather сервера")
     print("=" * 70)
-    print(f"URL: {base_url}")
+    print(f"HTTP URL: {base_url}")
+    print(f"SSE URL: {sse_url}")
+    if not MCP_AVAILABLE:
+        print("\n⚠️  MCP SDK не установлен. Установите: pip install mcp")
+        print("   Будут выполнены только базовые тесты (health check)")
     print("=" * 70)
     print()
     
@@ -248,20 +209,24 @@ async def main():
         # Тест 1: Health check
         results.append(await test_health(client, base_url))
         
-        # Тест 2: Список инструментов
-        tools = await test_list_tools(client, base_url)
-        results.append(tools is not None)
-        
-        # Тест 3: Текущая погода
-        results.append(await test_get_weather(client, base_url))
-        
-        # Тест 4: Прогноз (опционально)
-        if not args.skip_forecast:
-            results.append(await test_forecast(client, base_url))
-        
-        # Тест 5: Поиск местоположения (опционально)
-        if not args.skip_search:
-            results.append(await test_search_location(client, base_url))
+        if MCP_AVAILABLE:
+            # Тест 2: Список инструментов через SSE
+            tools = await test_list_tools_sse(sse_url)
+            results.append(tools is not None)
+            
+            # Тест 3: Текущая погода через SSE
+            results.append(await test_get_weather_sse(sse_url))
+            
+            # Тест 4: Прогноз (опционально)
+            if not args.skip_forecast:
+                results.append(await test_forecast_sse(sse_url))
+            
+            # Тест 5: Поиск местоположения (опционально)
+            if not args.skip_search:
+                results.append(await test_search_location_sse(sse_url))
+        else:
+            print("\n⚠️  Для полного тестирования установите MCP SDK:")
+            print("   pip install mcp")
     
     # Итоги
     print()
@@ -277,6 +242,9 @@ async def main():
         return 0
     else:
         print("⚠️  Некоторые тесты не прошли")
+        if not MCP_AVAILABLE:
+            print("\n💡 Совет: Установите MCP SDK для полного тестирования:")
+            print("   pip install mcp")
         return 1
 
 
